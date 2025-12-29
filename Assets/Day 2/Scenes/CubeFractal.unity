@@ -164,7 +164,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FractalGenerator
   fractalPrefab: {fileID: 181249325673249619, guid: dae04f87561208942a12eecdb96f9f1c, type: 3}
-  fractalSize: 4
+  fractalSize: 10
   scaleFactor: 0.5
 --- !u!1 &255745573
 GameObject:
