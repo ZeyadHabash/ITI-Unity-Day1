@@ -262,7 +262,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1bc6ce7baa12a474683ad41b252b6a8f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInit
-  player: {fileID: 8988311462693714242, guid: 124b56b8befebfc4587110b00b56e5c1, type: 3}
+  player: {fileID: 8198968432628673816, guid: 973d8c96007bb3547bbe3095e6db08de, type: 3}
 --- !u!4 &234672627
 Transform:
   m_ObjectHideFlags: 0
@@ -18700,8 +18700,8 @@ SceneRoots:
   - {fileID: 1149340919}
   - {fileID: 686029783}
   - {fileID: 1984157806}
-  - {fileID: 1638418745}
   - {fileID: 728300738}
+  - {fileID: 1638418745}
   - {fileID: 1088668580}
   - {fileID: 926161169}
   - {fileID: 324741682}
