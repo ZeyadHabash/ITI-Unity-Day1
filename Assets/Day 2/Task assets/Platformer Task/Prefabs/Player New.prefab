@@ -162,7 +162,6 @@ MonoBehaviour:
   jumpBufferTime: 0.1
   groundTag: Ground
   coinTag: Coin
-  gravity: 30
   primaryAttackCooldown: 0.5
   primaryAttackKey1: 122
   primaryAttackKey2: 106
@@ -188,8 +187,8 @@ Rigidbody2D:
   m_UseAutoMass: 0
   m_Mass: 1
   m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_GravityScale: 0
+  m_AngularDamping: 0
+  m_GravityScale: 2
   m_Material: {fileID: 6200000, guid: a81785507e69c9c4fa74b86e4f91de21, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
@@ -199,7 +198,7 @@ Rigidbody2D:
     m_Bits: 0
   m_Interpolate: 0
   m_SleepingMode: 1
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
   m_Constraints: 4
 --- !u!95 &4607602934602580254
 Animator:

@@ -5,10 +5,6 @@ public class PlayerControllerTopDown : MonoBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 8f;
 
-    [Header("Collision Settings")]
-    [SerializeField] private LayerMask wallLayer;
-    [SerializeField] private float collisionBuffer = 0.1f;
-
     [Header("Attack Settings")]
     [SerializeField] private float primaryAttackCooldown = 0.5f;
     [SerializeField] private float secondaryAttackCooldown = 0.8f;
@@ -18,9 +14,9 @@ public class PlayerControllerTopDown : MonoBehaviour
     [Header("Collectibles")]
     [SerializeField] private string coinTag = "Coin";
 
+    private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
     private Animator animator;
-    private BoxCollider2D boxCollider;
 
     private Vector2 inputDirection;
     private Vector2 currentVelocity;
@@ -33,9 +29,9 @@ public class PlayerControllerTopDown : MonoBehaviour
 
     private void Awake()
     {
+        rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
-        boxCollider = GetComponent<BoxCollider2D>();
     }
 
     private void Update()
@@ -63,55 +59,13 @@ public class PlayerControllerTopDown : MonoBehaviour
 
         currentVelocity = inputDirection * moveSpeed;
 
-        Move(currentVelocity * Time.deltaTime);
-
         UpdateAnimations();
     }
 
-    private void Move(Vector2 movement)
+    private void FixedUpdate()
     {
-
-        if (movement.x != 0f)
-        {
-            float directionX = Mathf.Sign(movement.x);
-            float distance = Mathf.Abs(movement.x) + collisionBuffer;
-
-            RaycastHit2D hit = Physics2D.BoxCast(
-                boxCollider.bounds.center,
-                boxCollider.bounds.size,
-                0f,
-                new Vector2(directionX, 0f),
-                distance,
-                wallLayer
-            );
-
-            if (hit.collider != null)
-            {
-                movement.x = (hit.distance - collisionBuffer) * directionX;
-            }
-        }
-
-        if (movement.y != 0f)
-        {
-            float directionY = Mathf.Sign(movement.y);
-            float distance = Mathf.Abs(movement.y) + collisionBuffer;
-
-            RaycastHit2D hit = Physics2D.BoxCast(
-                boxCollider.bounds.center,
-                boxCollider.bounds.size,
-                0f,
-                new Vector2(0f, directionY),
-                distance,
-                wallLayer
-            );
-
-            if (hit.collider != null)
-            {
-                movement.y = (hit.distance - collisionBuffer) * directionY;
-            }
-        }
-
-        transform.Translate(movement);
+        // Apply movement using Rigidbody2D - direct velocity for snappy movement
+        rb.linearVelocity = currentVelocity;
     }
 
     private void UpdateAnimations()

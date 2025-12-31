@@ -1,4 +1,3 @@
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
@@ -19,9 +18,6 @@ public class PlayerController : MonoBehaviour
     [Header("Collectibles")]
     [SerializeField] private string coinTag = "Coin";
 
-    [Header("Gravity")]
-    [SerializeField] private float gravity = 30f;
-
     [Header("Primary Attack Settings")]
     [SerializeField] private float primaryAttackCooldown = 0.5f;
     [SerializeField] private KeyCode primaryAttackKey1 = KeyCode.Z;
@@ -41,12 +37,12 @@ public class PlayerController : MonoBehaviour
     [Header("Long Idle Settings")]
     [SerializeField] private float longIdleTime = 30f;
 
+    private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
     private Animator animator;
 
     private float horizontalInput;
-    private float currentVelocity;
-    private float verticalVelocity;
+    private float currentHorizontalVelocity;
     private bool isFacingRight = true;
     private bool isGrounded;
     private float coyoteTimeCounter;
@@ -69,6 +65,7 @@ public class PlayerController : MonoBehaviour
 
     private void Awake()
     {
+        rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
     }
@@ -78,34 +75,7 @@ public class PlayerController : MonoBehaviour
         if (isDead) return;
 
         HandleAttack();
-
-        if (isSecondaryAttacking)
-        {
-            if (!isGrounded)
-            {
-                verticalVelocity -= gravity * Time.deltaTime;
-            }
-            Vector3 gravityMovement = new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime;
-            transform.Translate(gravityMovement);
-            UpdateAnimations();
-            UpdateCooldowns();
-            return;
-        }
-
         HandleDash();
-
-        if (isDashing)
-        {
-            Vector3 dashMovement = new Vector3(dashDirection * dashSpeed, 0f, 0f) * Time.deltaTime;
-            transform.Translate(dashMovement);
-
-            dashTimer -= Time.deltaTime;
-            if (dashTimer <= 0f)
-            {
-                isDashing = false;
-            }
-            return;
-        }
 
         horizontalInput = Input.GetAxisRaw("Horizontal");
 
@@ -127,40 +97,54 @@ public class PlayerController : MonoBehaviour
             jumpBufferCounter -= Time.deltaTime;
         }
 
-        if (jumpBufferCounter > 0f && coyoteTimeCounter > 0f)
+        if (Input.GetButtonUp("Jump") && rb.linearVelocity.y > 0f)
         {
-            verticalVelocity = jumpForce;
-            jumpBufferCounter = 0f;
-        }
-
-        if (Input.GetButtonUp("Jump") && verticalVelocity > 0f)
-        {
-            verticalVelocity *= 0.5f;
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * 0.5f);
             coyoteTimeCounter = 0f;
         }
 
-        // Apply gravity
-        if (!isGrounded)
+        Flip();
+        UpdateAnimations();
+        UpdateCooldowns();
+    }
+
+    private void FixedUpdate()
+    {
+        if (isDead) return;
+
+        if (isSecondaryAttacking)
         {
-            verticalVelocity -= gravity * Time.deltaTime;
+            // Keep current velocity during secondary attack (gravity handled by Rigidbody2D)
+            return;
         }
-        else if (verticalVelocity < 0f)
+
+        if (isDashing)
         {
-            verticalVelocity = 0f;
+            rb.linearVelocity = new Vector2(dashDirection * dashSpeed, 0f);
+
+            dashTimer -= Time.fixedDeltaTime;
+            if (dashTimer <= 0f)
+            {
+                isDashing = false;
+            }
+            return;
+        }
+
+        // Handle jump in FixedUpdate for physics consistency
+        if (jumpBufferCounter > 0f && coyoteTimeCounter > 0f)
+        {
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+            jumpBufferCounter = 0f;
+            coyoteTimeCounter = 0f;
         }
 
         // Calculate horizontal movement with acceleration/deceleration
         float targetVelocity = horizontalInput * moveSpeed;
         float accelerationRate = (Mathf.Abs(targetVelocity) > 0.01f) ? acceleration : deceleration;
-        currentVelocity = Mathf.MoveTowards(currentVelocity, targetVelocity, accelerationRate * Time.deltaTime);
+        currentHorizontalVelocity = Mathf.MoveTowards(currentHorizontalVelocity, targetVelocity, accelerationRate * Time.fixedDeltaTime);
 
-        // Apply movement using Transform
-        Vector3 movement = new Vector3(currentVelocity, verticalVelocity, 0f) * Time.deltaTime;
-        transform.Translate(movement);
-
-        Flip();
-        UpdateAnimations();
-        UpdateCooldowns();
+        // Apply movement using Rigidbody2D
+        rb.linearVelocity = new Vector2(currentHorizontalVelocity, rb.linearVelocity.y);
     }
 
     private void HandleAttack()
@@ -276,15 +260,15 @@ public class PlayerController : MonoBehaviour
         animator.SetBool("IsSecondaryAttacking", isSecondaryAttacking);
         animator.SetBool("IsDead", isDead);
 
-        bool isJumping = !isGrounded && verticalVelocity > 0f;
-        bool isFalling = !isGrounded && verticalVelocity < 0f;
+        bool isJumping = !isGrounded && rb.linearVelocity.y > 0f;
+        bool isFalling = !isGrounded && rb.linearVelocity.y < 0f;
         animator.SetBool("IsJumping", isJumping);
         animator.SetBool("IsFalling", isFalling);
 
-        bool isStopping = isGrounded && Mathf.Abs(horizontalInput) < 0.01f && Mathf.Abs(currentVelocity) > 0.1f;
+        bool isStopping = isGrounded && Mathf.Abs(horizontalInput) < 0.01f && Mathf.Abs(currentHorizontalVelocity) > 0.1f;
         animator.SetBool("IsStopping", isStopping);
 
-        bool isIdle = isGrounded && Mathf.Abs(horizontalInput) < 0.01f && Mathf.Abs(currentVelocity) < 0.1f
+        bool isIdle = isGrounded && Mathf.Abs(horizontalInput) < 0.01f && Mathf.Abs(currentHorizontalVelocity) < 0.1f
                       && !isPrimaryAttacking && !isSecondaryAttacking && !isDashing;
 
         if (isIdle)
@@ -307,7 +291,34 @@ public class PlayerController : MonoBehaviour
     {
         if (collision.gameObject.CompareTag(groundTag))
         {
-            isGrounded = true;
+            // Check if we're hitting from above (standing on ground) vs from the side
+            foreach (ContactPoint2D contact in collision.contacts)
+            {
+                // Normal pointing up means we're standing on top
+                if (contact.normal.y > 0.5f)
+                {
+                    isGrounded = true;
+                    return;
+                }
+            }
+        }
+    }
+
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag(groundTag))
+        {
+            // Continuously check ground contact while colliding
+            bool foundGround = false;
+            foreach (ContactPoint2D contact in collision.contacts)
+            {
+                if (contact.normal.y > 0.5f)
+                {
+                    foundGround = true;
+                    break;
+                }
+            }
+            isGrounded = foundGround;
         }
     }
 
