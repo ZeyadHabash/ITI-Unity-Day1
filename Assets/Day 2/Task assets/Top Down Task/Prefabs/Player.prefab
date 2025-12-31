@@ -129,7 +129,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4d369cd794ee4f49ac2382909fffb77, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerControllerTopDown
-  moveSpeed: 8
+  moveSpeed: 6
   wallLayer:
     serializedVersion: 2
     m_Bits: 64

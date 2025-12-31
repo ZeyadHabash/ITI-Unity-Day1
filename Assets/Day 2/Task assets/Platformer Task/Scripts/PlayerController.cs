@@ -75,19 +75,27 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        // Don't process input if dead
         if (isDead) return;
 
-        // Handle attack input
         HandleAttack();
 
-        // Handle dash input
+        if (isSecondaryAttacking)
+        {
+            if (!isGrounded)
+            {
+                verticalVelocity -= gravity * Time.deltaTime;
+            }
+            Vector3 gravityMovement = new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime;
+            transform.Translate(gravityMovement);
+            UpdateAnimations();
+            UpdateCooldowns();
+            return;
+        }
+
         HandleDash();
 
-        // If dashing, skip normal movement
         if (isDashing)
         {
-            // Apply dash movement
             Vector3 dashMovement = new Vector3(dashDirection * dashSpeed, 0f, 0f) * Time.deltaTime;
             transform.Translate(dashMovement);
 
