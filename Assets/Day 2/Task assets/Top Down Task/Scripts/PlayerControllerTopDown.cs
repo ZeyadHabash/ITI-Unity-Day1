@@ -4,8 +4,10 @@ public class PlayerControllerTopDown : MonoBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 8f;
-    [SerializeField] private float acceleration = 10f;
-    [SerializeField] private float deceleration = 10f;
+
+    [Header("Collision Settings")]
+    [SerializeField] private LayerMask wallLayer;
+    [SerializeField] private float collisionBuffer = 0.1f;
 
     [Header("Attack Settings")]
     [SerializeField] private float primaryAttackCooldown = 0.5f;
@@ -18,7 +20,7 @@ public class PlayerControllerTopDown : MonoBehaviour
 
     private SpriteRenderer spriteRenderer;
     private Animator animator;
-    private Rigidbody2D rb;
+    private BoxCollider2D boxCollider;
 
     private Vector2 inputDirection;
     private Vector2 currentVelocity;
@@ -33,14 +35,7 @@ public class PlayerControllerTopDown : MonoBehaviour
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
-        rb = GetComponent<Rigidbody2D>();
-
-        // Ensure Rigidbody2D is set up correctly for top-down
-        if (rb != null)
-        {
-            rb.gravityScale = 0f;
-            rb.freezeRotation = true;
-        }
+        boxCollider = GetComponent<BoxCollider2D>();
     }
 
     private void Update()
@@ -52,55 +47,80 @@ public class PlayerControllerTopDown : MonoBehaviour
 
         HandleAttackInput();
 
-        inputDirection.x = Input.GetAxisRaw("Horizontal");
-        inputDirection.y = Input.GetAxisRaw("Vertical");
+        float horizontal = Input.GetAxisRaw("Horizontal");
+        float vertical = Input.GetAxisRaw("Vertical");
+        inputDirection = new Vector2(horizontal, vertical);
 
         if (inputDirection.magnitude > 1f)
         {
             inputDirection.Normalize();
         }
 
-        if (inputDirection.magnitude > 0.1f)
+        if (inputDirection.sqrMagnitude > 0.01f)
         {
             lastMoveDirection = inputDirection.normalized;
         }
 
-        // Calculate target velocity with acceleration/deceleration
-        Vector2 targetVelocity = inputDirection * moveSpeed;
-        float accelerationRate = (inputDirection.magnitude > 0.01f) ? acceleration : deceleration;
-        currentVelocity = Vector2.MoveTowards(currentVelocity, targetVelocity, accelerationRate * Time.deltaTime);
+        currentVelocity = inputDirection * moveSpeed;
+
+        Move(currentVelocity * Time.deltaTime);
 
         UpdateAnimations();
     }
 
-    private void FixedUpdate()
+    private void Move(Vector2 movement)
     {
-        // Use Rigidbody2D for physics-based movement (respects colliders)
-        if (rb != null)
+
+        if (movement.x != 0f)
         {
-            rb.MovePosition(rb.position + currentVelocity * Time.fixedDeltaTime);
+            float directionX = Mathf.Sign(movement.x);
+            float distance = Mathf.Abs(movement.x) + collisionBuffer;
+
+            RaycastHit2D hit = Physics2D.BoxCast(
+                boxCollider.bounds.center,
+                boxCollider.bounds.size,
+                0f,
+                new Vector2(directionX, 0f),
+                distance,
+                wallLayer
+            );
+
+            if (hit.collider != null)
+            {
+                movement.x = (hit.distance - collisionBuffer) * directionX;
+            }
         }
+
+        if (movement.y != 0f)
+        {
+            float directionY = Mathf.Sign(movement.y);
+            float distance = Mathf.Abs(movement.y) + collisionBuffer;
+
+            RaycastHit2D hit = Physics2D.BoxCast(
+                boxCollider.bounds.center,
+                boxCollider.bounds.size,
+                0f,
+                new Vector2(0f, directionY),
+                distance,
+                wallLayer
+            );
+
+            if (hit.collider != null)
+            {
+                movement.y = (hit.distance - collisionBuffer) * directionY;
+            }
+        }
+
+        transform.Translate(movement);
     }
 
     private void UpdateAnimations()
     {
         if (animator == null) return;
 
-        // Set speed for blend tree or transition conditions
-        animator.SetFloat("Speed", currentVelocity.magnitude / moveSpeed);
-
-        // Set direction values for 4-directional animations
-        animator.SetFloat("Horizontal", lastMoveDirection.x);
-        animator.SetFloat("Vertical", lastMoveDirection.y);
-
-        // Set the dominant direction for state machine transitions
-        // This helps with 4-directional sprite selection
+        animator.SetFloat("Speed", inputDirection.magnitude);
         animator.SetFloat("LastHorizontal", lastMoveDirection.x);
         animator.SetFloat("LastVertical", lastMoveDirection.y);
-
-        // Boolean states for animation transitions
-        animator.SetBool("IsMoving", currentVelocity.magnitude > 0.1f);
-        animator.SetBool("IsAttacking", isAttacking);
     }
 
     private void OnTriggerEnter2D(Collider2D other)

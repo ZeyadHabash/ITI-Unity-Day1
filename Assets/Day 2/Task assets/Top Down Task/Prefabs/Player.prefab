@@ -83,7 +83,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 2
   m_MaskInteraction: 0
   m_Sprite: {fileID: -1213468416, guid: 1f129c0fd684fb144996968de0a4865b, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -130,8 +130,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerControllerTopDown
   moveSpeed: 8
-  acceleration: 10
-  deceleration: 10
+  wallLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  collisionBuffer: 0.1
   primaryAttackCooldown: 0.5
   secondaryAttackCooldown: 0.8
   attackDamage: 10
@@ -171,7 +173,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 0.013973545, y: -0.015720174}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
@@ -181,7 +183,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.19, y: 0.34}
+  m_Size: {x: 0.10383033, y: 0.14320682}
   m_EdgeRadius: 0
 --- !u!50 &-7752775772890475551
 Rigidbody2D:
