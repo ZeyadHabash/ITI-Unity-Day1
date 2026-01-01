@@ -37,6 +37,10 @@ public class PlayerController : MonoBehaviour
     [Header("Long Idle Settings")]
     [SerializeField] private float longIdleTime = 30f;
 
+    [Header("Health Settings")]
+    [SerializeField] private float maxHealth = 100f;
+    [SerializeField] private float invincibilityDuration = 1f;
+
     private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
     private Animator animator;
@@ -63,16 +67,42 @@ public class PlayerController : MonoBehaviour
     private float idleTimer;
     private bool isLongIdle;
 
+    // Collectibles tracking
+    private int coinsCollected = 0;
+
+    // Health state
+    private float currentHealth;
+    private bool isInvincible = false;
+    private float invincibilityTimer = 0f;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
+        currentHealth = maxHealth;
     }
 
     private void Update()
     {
         if (isDead) return;
+
+        // Handle invincibility timer
+        if (isInvincible)
+        {
+            invincibilityTimer -= Time.deltaTime;
+            if (invincibilityTimer <= 0f)
+            {
+                isInvincible = false;
+                // Reset sprite alpha
+                if (spriteRenderer != null)
+                {
+                    Color color = spriteRenderer.color;
+                    color.a = 1f;
+                    spriteRenderer.color = color;
+                }
+            }
+        }
 
         HandleAttack();
         HandleDash();
@@ -326,7 +356,8 @@ public class PlayerController : MonoBehaviour
     {
         if (other.gameObject.CompareTag(coinTag))
         {
-            // increment score
+            coinsCollected++;
+            Debug.Log($"Coin collected! Total coins: {coinsCollected}");
             Destroy(other.gameObject);
         }
     }
@@ -337,5 +368,77 @@ public class PlayerController : MonoBehaviour
         {
             isGrounded = false;
         }
+    }
+
+    /// <summary>
+    /// Deal damage to the player
+    /// </summary>
+    public void TakeDamage(float damage)
+    {
+        if (isDead || isInvincible) return;
+
+        currentHealth -= damage;
+        Debug.Log($"Player took {damage} damage! Current HP: {currentHealth}/{maxHealth}");
+
+        // Start invincibility
+        isInvincible = true;
+        invincibilityTimer = invincibilityDuration;
+
+        // Visual feedback - flash sprite
+        if (spriteRenderer != null)
+        {
+            Color color = spriteRenderer.color;
+            color.a = 0.5f;
+            spriteRenderer.color = color;
+        }
+
+        if (animator != null)
+        {
+            animator.SetTrigger("TakeHit");
+        }
+
+        if (currentHealth <= 0f)
+        {
+            Die();
+        }
+    }
+
+    private void Die()
+    {
+        isDead = true;
+        currentHealth = 0f;
+        rb.linearVelocity = Vector2.zero;
+
+        Debug.Log("Player died!");
+
+        if (animator != null)
+        {
+            animator.SetTrigger("Die");
+            animator.SetBool("IsDead", true);
+        }
+    }
+
+    /// <summary>
+    /// Returns current health
+    /// </summary>
+    public float GetCurrentHealth()
+    {
+        return currentHealth;
+    }
+
+    /// <summary>
+    /// Returns max health
+    /// </summary>
+    public float GetMaxHealth()
+    {
+        return maxHealth;
+    }
+
+    /// <summary>
+    /// Returns whether the player is dead
+    /// </summary>
+    public bool IsDead()
+    {
+        return isDead;
     }
 }

@@ -1,9 +1,16 @@
+using System.Collections;
 using UnityEngine;
 
 public class PlayerControllerTopDown : MonoBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 8f;
+
+    [Header("Health Settings")]
+    [SerializeField] private float maxHealth = 100f;
+    [SerializeField] private float invincibilityDuration = 1f;
+    [SerializeField] private int blinkCount = 5;
+    [SerializeField] private float blinkInterval = 0.1f;
 
     [Header("Attack Settings")]
     [SerializeField] private float primaryAttackCooldown = 0.5f;
@@ -27,15 +34,27 @@ public class PlayerControllerTopDown : MonoBehaviour
     private float secondaryAttackTimer = 0f;
     private bool isAttacking = false;
 
+    // Collectibles tracking
+    private int coinsCollected = 0;
+
+    // Health state
+    private float currentHealth;
+    private bool isInvincible = false;
+    private float invincibilityTimer = 0f;
+    private bool isDead = false;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
+        currentHealth = maxHealth;
     }
 
     private void Update()
     {
+        if (isDead) return;
+
         if (primaryAttackTimer > 0f)
             primaryAttackTimer -= Time.deltaTime;
         if (secondaryAttackTimer > 0f)
@@ -81,6 +100,8 @@ public class PlayerControllerTopDown : MonoBehaviour
     {
         if (other.gameObject.CompareTag(coinTag))
         {
+            coinsCollected++;
+            Debug.Log($"Coin collected! Total coins: {coinsCollected}");
             Destroy(other.gameObject);
         }
     }
@@ -152,5 +173,96 @@ public class PlayerControllerTopDown : MonoBehaviour
     public bool IsAttacking()
     {
         return isAttacking;
+    }
+
+    /// <summary>
+    /// Deal damage to the player
+    /// </summary>
+    public void TakeDamage(float damage)
+    {
+        if (isDead || isInvincible) return;
+
+        currentHealth -= damage;
+        Debug.Log($"Player took {damage} damage! Current HP: {currentHealth}/{maxHealth}");
+
+        // Start invincibility
+        isInvincible = true;
+        invincibilityTimer = invincibilityDuration;
+
+        // Visual feedback - blink sprite
+        StartCoroutine(BlinkCoroutine());
+
+        if (animator != null)
+        {
+            animator.SetTrigger("Hurt");
+        }
+
+        if (currentHealth <= 0f)
+        {
+            Die();
+        }
+    }
+
+    private void Die()
+    {
+        isDead = true;
+        currentHealth = 0f;
+        rb.linearVelocity = Vector2.zero;
+
+        // Stop blinking and ensure sprite is visible
+        StopAllCoroutines();
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.enabled = true;
+        }
+
+        Debug.Log("Player died!");
+
+        if (animator != null)
+        {
+            animator.SetTrigger("Die");
+            animator.SetBool("IsDead", true);
+        }
+    }
+
+    private IEnumerator BlinkCoroutine()
+    {
+        if (spriteRenderer == null) yield break;
+
+        for (int i = 0; i < blinkCount; i++)
+        {
+            spriteRenderer.enabled = false;
+            yield return new WaitForSeconds(blinkInterval);
+            spriteRenderer.enabled = true;
+            yield return new WaitForSeconds(blinkInterval);
+        }
+
+        // Ensure sprite is visible and invincibility ends
+        spriteRenderer.enabled = true;
+        isInvincible = false;
+    }
+
+    /// <summary>
+    /// Returns current health
+    /// </summary>
+    public float GetCurrentHealth()
+    {
+        return currentHealth;
+    }
+
+    /// <summary>
+    /// Returns max health
+    /// </summary>
+    public float GetMaxHealth()
+    {
+        return maxHealth;
+    }
+
+    /// <summary>
+    /// Returns whether the player is dead
+    /// </summary>
+    public bool IsDead()
+    {
+        return isDead;
     }
 }
