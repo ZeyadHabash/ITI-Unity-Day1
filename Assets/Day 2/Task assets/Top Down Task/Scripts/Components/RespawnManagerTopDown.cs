@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 
 namespace TopDown
 {
@@ -113,8 +114,11 @@ namespace TopDown
 
         private void OnPlayerDeath()
         {
-            // Optional: Auto-respawn on death
-            // Invoke(nameof(Respawn), respawnDelay);
+            // if (respawnDelay > 0)
+            //     Invoke(nameof(Respawn), respawnDelay);
+            // else
+            //     Respawn();
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
         /// <summary>

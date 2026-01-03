@@ -42,7 +42,12 @@ namespace TopDown
 
         private void Awake()
         {
+            // Try to get SpriteRenderer on this object first, then search in children
             spriteRenderer = GetComponent<SpriteRenderer>();
+            if (spriteRenderer == null)
+            {
+                spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            }
             animator = GetComponent<Animator>();
             currentHealth = maxHealth;
         }

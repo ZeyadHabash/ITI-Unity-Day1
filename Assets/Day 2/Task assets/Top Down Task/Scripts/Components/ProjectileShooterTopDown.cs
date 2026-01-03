@@ -15,7 +15,6 @@ namespace TopDown
 
         [Header("Shooting Settings")]
         [SerializeField] private float cooldown = 0.5f;
-        [SerializeField] private bool autoAim = false;
         [SerializeField] private string targetTag = "Enemy";
 
         [Header("Events")]
@@ -130,28 +129,6 @@ namespace TopDown
 
         private Vector2 GetShootDirection()
         {
-            if (autoAim)
-            {
-                GameObject[] targets = GameObject.FindGameObjectsWithTag(targetTag);
-                Transform nearest = null;
-                float nearestDistance = float.MaxValue;
-
-                foreach (GameObject target in targets)
-                {
-                    float distance = Vector2.Distance(transform.position, target.transform.position);
-                    if (distance < nearestDistance)
-                    {
-                        nearestDistance = distance;
-                        nearest = target.transform;
-                    }
-                }
-
-                if (nearest != null)
-                {
-                    return (nearest.position - transform.position).normalized;
-                }
-            }
-
             // Default to facing direction
             if (directionController != null)
             {

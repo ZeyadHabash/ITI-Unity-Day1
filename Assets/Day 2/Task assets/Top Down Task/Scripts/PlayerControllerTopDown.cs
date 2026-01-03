@@ -21,6 +21,7 @@ namespace TopDown
 
         [Header("Collectibles")]
         [SerializeField] private string coinTag = "Coin";
+        [SerializeField] private float coinCollectionRadius = 0.5f;
 
         // Component references
         private Rigidbody2D rb;
@@ -184,11 +185,26 @@ namespace TopDown
 
         private void OnTriggerEnter2D(Collider2D other)
         {
+            TryCollectCoin(other);
+        }
+
+        private void OnTriggerStay2D(Collider2D other)
+        {
+            TryCollectCoin(other);
+        }
+
+        private void TryCollectCoin(Collider2D other)
+        {
             if (other.gameObject.CompareTag(coinTag))
             {
-                coinsCollected++;
-                Debug.Log($"Coin collected! Total coins: {coinsCollected}");
-                Destroy(other.gameObject);
+                // Only collect if the coin is within the collection radius (not just the magnet range)
+                float distance = Vector2.Distance(transform.position, other.transform.position);
+                if (distance <= coinCollectionRadius)
+                {
+                    coinsCollected++;
+                    Debug.Log($"Coin collected! Total coins: {coinsCollected}");
+                    Destroy(other.gameObject);
+                }
             }
         }
 

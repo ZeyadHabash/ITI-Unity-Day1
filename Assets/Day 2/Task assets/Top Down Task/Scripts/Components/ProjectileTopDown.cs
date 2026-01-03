@@ -89,6 +89,7 @@ namespace TopDown
             // Check if hit obstacle
             foreach (string tag in destroyOnHitTags)
             {
+                Debug.Log($"Checking collision with tag: {tag}");
                 if (other.CompareTag(tag))
                 {
                     Destroy(gameObject);

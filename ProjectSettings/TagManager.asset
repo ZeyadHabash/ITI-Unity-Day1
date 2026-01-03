@@ -12,6 +12,7 @@ TagManager:
   - Enemy
   - Wall
   - Ladder
+  - Obstacle
   layers:
   - Default
   - TransparentFX
@@ -20,7 +21,7 @@ TagManager:
   - Water
   - UI
   - Wall
-  - 
+  - Attractable
   - 
   - 
   - 
