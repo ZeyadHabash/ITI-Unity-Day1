@@ -1,268 +1,220 @@
-using System.Collections;
 using UnityEngine;
 
-public class PlayerControllerTopDown : MonoBehaviour
+namespace TopDown
 {
-    [Header("Movement Settings")]
-    [SerializeField] private float moveSpeed = 8f;
-
-    [Header("Health Settings")]
-    [SerializeField] private float maxHealth = 100f;
-    [SerializeField] private float invincibilityDuration = 1f;
-    [SerializeField] private int blinkCount = 5;
-    [SerializeField] private float blinkInterval = 0.1f;
-
-    [Header("Attack Settings")]
-    [SerializeField] private float primaryAttackCooldown = 0.5f;
-    [SerializeField] private float secondaryAttackCooldown = 0.8f;
-    [SerializeField] private float attackDamage = 10f;
-    [SerializeField] private float secondaryAttackDamage = 20f;
-
-    [Header("Collectibles")]
-    [SerializeField] private string coinTag = "Coin";
-
-    private Rigidbody2D rb;
-    private SpriteRenderer spriteRenderer;
-    private Animator animator;
-
-    private Vector2 inputDirection;
-    private Vector2 currentVelocity;
-    private Vector2 lastMoveDirection = Vector2.down; // Default facing down
-
-    // Attack state
-    private float primaryAttackTimer = 0f;
-    private float secondaryAttackTimer = 0f;
-    private bool isAttacking = false;
-
-    // Collectibles tracking
-    private int coinsCollected = 0;
-
-    // Health state
-    private float currentHealth;
-    private bool isInvincible = false;
-    private float invincibilityTimer = 0f;
-    private bool isDead = false;
-
-    private void Awake()
-    {
-        rb = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        animator = GetComponent<Animator>();
-        currentHealth = maxHealth;
-    }
-
-    private void Update()
-    {
-        if (isDead) return;
-
-        if (primaryAttackTimer > 0f)
-            primaryAttackTimer -= Time.deltaTime;
-        if (secondaryAttackTimer > 0f)
-            secondaryAttackTimer -= Time.deltaTime;
-
-        HandleAttackInput();
-
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        float vertical = Input.GetAxisRaw("Vertical");
-        inputDirection = new Vector2(horizontal, vertical);
-
-        if (inputDirection.magnitude > 1f)
-        {
-            inputDirection.Normalize();
-        }
-
-        if (inputDirection.sqrMagnitude > 0.01f)
-        {
-            lastMoveDirection = inputDirection.normalized;
-        }
-
-        currentVelocity = inputDirection * moveSpeed;
-
-        UpdateAnimations();
-    }
-
-    private void FixedUpdate()
-    {
-        // Apply movement using Rigidbody2D - direct velocity for snappy movement
-        rb.linearVelocity = currentVelocity;
-    }
-
-    private void UpdateAnimations()
-    {
-        if (animator == null) return;
-
-        animator.SetFloat("Speed", inputDirection.magnitude);
-        animator.SetFloat("LastHorizontal", lastMoveDirection.x);
-        animator.SetFloat("LastVertical", lastMoveDirection.y);
-    }
-
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        if (other.gameObject.CompareTag(coinTag))
-        {
-            coinsCollected++;
-            Debug.Log($"Coin collected! Total coins: {coinsCollected}");
-            Destroy(other.gameObject);
-        }
-    }
-
     /// <summary>
-    /// Returns the current velocity of the player (useful for camera look-ahead)
+    /// Refactored PlayerControllerTopDown using modular components
+    /// Attach HealthTopDown, DirectionController, ProjectileShooterTopDown, and RespawnManagerTopDown components
     /// </summary>
-    public Vector2 GetVelocity()
+    [RequireComponent(typeof(Rigidbody2D))]
+    public class PlayerControllerTopDown : MonoBehaviour
     {
-        return currentVelocity;
-    }
+        [Header("Movement Settings")]
+        [SerializeField] private float moveSpeed = 8f;
 
-    /// <summary>
-    /// Returns the last move direction (useful for attack direction)
-    /// </summary>
-    public Vector2 GetFacingDirection()
-    {
-        return lastMoveDirection;
-    }
+        [Header("Attack Settings")]
+        [SerializeField] private float primaryAttackCooldown = 0.5f;
+        [SerializeField] private KeyCode primaryAttackKey1 = KeyCode.Z;
+        [SerializeField] private KeyCode primaryAttackKey2 = KeyCode.J;
+        [SerializeField] private KeyCode secondaryAttackKey1 = KeyCode.X;
+        [SerializeField] private KeyCode secondaryAttackKey2 = KeyCode.K;
 
-    private void HandleAttackInput()
-    {
-        if ((Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.J)) && primaryAttackTimer <= 0f && !isAttacking)
+        [Header("Collectibles")]
+        [SerializeField] private string coinTag = "Coin";
+
+        // Component references
+        private Rigidbody2D rb;
+        private Animator animator;
+        private HealthTopDown health;
+        private DirectionController directionController;
+        private ProjectileShooterTopDown projectileShooter;
+
+        // Movement state
+        private Vector2 inputDirection;
+        private Vector2 currentVelocity;
+
+        // Attack state
+        private float primaryAttackTimer = 0f;
+        private bool isAttacking = false;
+
+        // Collectibles
+        private int coinsCollected = 0;
+
+        public bool IsDead => health != null && health.Dead;
+        public int CoinsCollected => coinsCollected;
+
+        private void Awake()
         {
-            PrimaryAttack();
+            // Get required components
+            rb = GetComponent<Rigidbody2D>();
+            animator = GetComponent<Animator>();
+
+            // Get modular components
+            health = GetComponent<HealthTopDown>();
+            directionController = GetComponent<DirectionController>();
+            projectileShooter = GetComponent<ProjectileShooterTopDown>();
+
+            // Subscribe to health events
+            if (health != null)
+            {
+                health.OnDeath.AddListener(OnDeath);
+            }
         }
 
-        if ((Input.GetKeyDown(KeyCode.X) || Input.GetKeyDown(KeyCode.K)) && secondaryAttackTimer <= 0f && !isAttacking)
+        private void OnDestroy()
         {
-            SecondaryAttack();
-        }
-    }
-
-    private void PrimaryAttack()
-    {
-        primaryAttackTimer = primaryAttackCooldown;
-        isAttacking = true;
-
-        if (animator != null)
-        {
-            animator.SetTrigger("PrimaryAttack");
+            if (health != null)
+            {
+                health.OnDeath.RemoveListener(OnDeath);
+            }
         }
 
-        Debug.Log("Primary Attack!");
-
-        Invoke(nameof(ResetAttackState), 0.2f);
-    }
-
-    private void SecondaryAttack()
-    {
-        secondaryAttackTimer = secondaryAttackCooldown;
-        isAttacking = true;
-
-        if (animator != null)
+        private void Update()
         {
-            animator.SetTrigger("SecondaryAttack");
+            if (IsDead) return;
+
+            // Update cooldowns
+            if (primaryAttackTimer > 0f)
+                primaryAttackTimer -= Time.deltaTime;
+
+            HandleInput();
+            HandleAttackInput();
+            UpdateAnimations();
         }
 
-        Debug.Log("Secondary Attack!");
-
-        Invoke(nameof(ResetAttackState), 0.3f);
-    }
-
-    private void ResetAttackState()
-    {
-        isAttacking = false;
-    }
-
-    public bool IsAttacking()
-    {
-        return isAttacking;
-    }
-
-    /// <summary>
-    /// Deal damage to the player
-    /// </summary>
-    public void TakeDamage(float damage)
-    {
-        if (isDead || isInvincible) return;
-
-        currentHealth -= damage;
-        Debug.Log($"Player took {damage} damage! Current HP: {currentHealth}/{maxHealth}");
-
-        // Start invincibility
-        isInvincible = true;
-        invincibilityTimer = invincibilityDuration;
-
-        // Visual feedback - blink sprite
-        StartCoroutine(BlinkCoroutine());
-
-        if (animator != null)
+        private void FixedUpdate()
         {
-            animator.SetTrigger("Hurt");
+            if (IsDead)
+            {
+                rb.linearVelocity = Vector2.zero;
+                return;
+            }
+
+            rb.linearVelocity = currentVelocity;
         }
 
-        if (currentHealth <= 0f)
+        private void HandleInput()
         {
-            Die();
-        }
-    }
+            float horizontal = Input.GetAxisRaw("Horizontal");
+            float vertical = Input.GetAxisRaw("Vertical");
+            inputDirection = new Vector2(horizontal, vertical);
 
-    private void Die()
-    {
-        isDead = true;
-        currentHealth = 0f;
-        rb.linearVelocity = Vector2.zero;
+            if (inputDirection.magnitude > 1f)
+            {
+                inputDirection.Normalize();
+            }
 
-        // Stop blinking and ensure sprite is visible
-        StopAllCoroutines();
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.enabled = true;
-        }
+            // Update direction controller
+            if (directionController != null)
+            {
+                directionController.UpdateDirection(inputDirection);
+            }
 
-        Debug.Log("Player died!");
-
-        if (animator != null)
-        {
-            animator.SetTrigger("Die");
-            animator.SetBool("IsDead", true);
-        }
-    }
-
-    private IEnumerator BlinkCoroutine()
-    {
-        if (spriteRenderer == null) yield break;
-
-        for (int i = 0; i < blinkCount; i++)
-        {
-            spriteRenderer.enabled = false;
-            yield return new WaitForSeconds(blinkInterval);
-            spriteRenderer.enabled = true;
-            yield return new WaitForSeconds(blinkInterval);
+            currentVelocity = inputDirection * moveSpeed;
         }
 
-        // Ensure sprite is visible and invincibility ends
-        spriteRenderer.enabled = true;
-        isInvincible = false;
-    }
+        private void HandleAttackInput()
+        {
+            // Primary Attack
+            if ((Input.GetKeyDown(primaryAttackKey1) || Input.GetKeyDown(primaryAttackKey2))
+                && primaryAttackTimer <= 0f && !isAttacking)
+            {
+                PrimaryAttack();
+            }
 
-    /// <summary>
-    /// Returns current health
-    /// </summary>
-    public float GetCurrentHealth()
-    {
-        return currentHealth;
-    }
+            // Secondary Attack (Projectile)
+            if ((Input.GetKeyDown(secondaryAttackKey1) || Input.GetKeyDown(secondaryAttackKey2)) && !isAttacking)
+            {
+                if (projectileShooter != null && projectileShooter.CanShoot)
+                {
+                    SecondaryAttack();
+                }
+            }
+        }
 
-    /// <summary>
-    /// Returns max health
-    /// </summary>
-    public float GetMaxHealth()
-    {
-        return maxHealth;
-    }
+        private void PrimaryAttack()
+        {
+            primaryAttackTimer = primaryAttackCooldown;
+            isAttacking = true;
 
-    /// <summary>
-    /// Returns whether the player is dead
-    /// </summary>
-    public bool IsDead()
-    {
-        return isDead;
+            if (animator != null)
+            {
+                animator.SetTrigger("PrimaryAttack");
+            }
+
+            Debug.Log("Primary Attack!");
+            Invoke(nameof(ResetAttackState), 0.2f);
+        }
+
+        private void SecondaryAttack()
+        {
+            isAttacking = true;
+
+            if (animator != null)
+            {
+                animator.SetTrigger("SecondaryAttack");
+            }
+
+            if (projectileShooter != null)
+            {
+                projectileShooter.Shoot();
+            }
+
+            Debug.Log("Secondary Attack!");
+            Invoke(nameof(ResetAttackState), 0.3f);
+        }
+
+        private void ResetAttackState()
+        {
+            isAttacking = false;
+        }
+
+        private void UpdateAnimations()
+        {
+            if (animator == null) return;
+
+            animator.SetFloat("Speed", inputDirection.magnitude);
+
+            if (directionController != null)
+            {
+                animator.SetFloat("LastHorizontal", directionController.Horizontal);
+                animator.SetFloat("LastVertical", directionController.Vertical);
+            }
+        }
+
+        private void OnTriggerEnter2D(Collider2D other)
+        {
+            if (other.gameObject.CompareTag(coinTag))
+            {
+                coinsCollected++;
+                Debug.Log($"Coin collected! Total coins: {coinsCollected}");
+                Destroy(other.gameObject);
+            }
+        }
+
+        private void OnDeath()
+        {
+            rb.linearVelocity = Vector2.zero;
+            Debug.Log("Player died!");
+        }
+
+        // Public accessors
+        public Vector2 GetVelocity() => currentVelocity;
+
+        public Vector2 GetFacingDirection()
+        {
+            if (directionController != null)
+            {
+                return directionController.FacingDirection;
+            }
+            return Vector2.down;
+        }
+
+        public bool IsAttacking() => isAttacking;
+        public void AddCoins(int amount) => coinsCollected += amount;
+
+        public HealthTopDown GetHealth() => health;
+        public DirectionController GetDirectionController() => directionController;
+        public ProjectileShooterTopDown GetProjectileShooter() => projectileShooter;
     }
 }

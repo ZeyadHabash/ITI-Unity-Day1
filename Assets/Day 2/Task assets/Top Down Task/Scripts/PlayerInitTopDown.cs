@@ -1,11 +1,14 @@
 using UnityEngine;
 
-public class PlayerInitTopDown : MonoBehaviour
+namespace TopDown
 {
-    [SerializeField] private GameObject player;
-
-    private void Start()
+    public class PlayerInitTopDown : MonoBehaviour
     {
-        Instantiate(player, transform.position, Quaternion.identity);
+        [SerializeField] private GameObject player;
+
+        private void Start()
+        {
+            Instantiate(player, transform.position, Quaternion.identity);
+        }
     }
 }

@@ -1,444 +1,425 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
-public class PlayerController : MonoBehaviour
+namespace Platformer
 {
-    [Header("Movement Settings")]
-    [SerializeField] private float moveSpeed = 8f;
-    [SerializeField] private float acceleration = 10f;
-    [SerializeField] private float deceleration = 10f;
-
-    [Header("Jump Settings")]
-    [SerializeField] private float jumpForce = 12f;
-    [SerializeField] private float coyoteTime = 0.1f;
-    [SerializeField] private float jumpBufferTime = 0.1f;
-
-    [Header("Ground Check")]
-    [SerializeField] private string groundTag = "Ground";
-
-    [Header("Collectibles")]
-    [SerializeField] private string coinTag = "Coin";
-
-    [Header("Primary Attack Settings")]
-    [SerializeField] private float primaryAttackCooldown = 0.5f;
-    [SerializeField] private KeyCode primaryAttackKey1 = KeyCode.Z;
-    [SerializeField] private KeyCode primaryAttackKey2 = KeyCode.J;
-
-    [Header("Secondary Attack Settings")]
-    [SerializeField] private float secondaryAttackCooldown = 0.8f;
-    [SerializeField] private KeyCode secondaryAttackKey1 = KeyCode.X;
-    [SerializeField] private KeyCode secondaryAttackKey2 = KeyCode.K;
-
-    [Header("Dash Settings")]
-    [SerializeField] private float dashSpeed = 20f;
-    [SerializeField] private float dashDuration = 0.2f;
-    [SerializeField] private float dashCooldown = 1f;
-    [SerializeField] private KeyCode dashKey = KeyCode.LeftShift;
-
-    [Header("Long Idle Settings")]
-    [SerializeField] private float longIdleTime = 30f;
-
-    [Header("Health Settings")]
-    [SerializeField] private float maxHealth = 100f;
-    [SerializeField] private float invincibilityDuration = 1f;
-
-    private Rigidbody2D rb;
-    private SpriteRenderer spriteRenderer;
-    private Animator animator;
-
-    private float horizontalInput;
-    private float currentHorizontalVelocity;
-    private bool isFacingRight = true;
-    private bool isGrounded;
-    private float coyoteTimeCounter;
-    private float jumpBufferCounter;
-
-    private bool isPrimaryAttacking;
-    private bool isSecondaryAttacking;
-    private float primaryAttackCooldownTimer;
-    private float secondaryAttackCooldownTimer;
-
-    private bool isDashing;
-    private float dashTimer;
-    private float dashCooldownTimer;
-    private float dashDirection;
-
-    private bool isDead;
-
-    private float idleTimer;
-    private bool isLongIdle;
-
-    // Collectibles tracking
-    private int coinsCollected = 0;
-
-    // Health state
-    private float currentHealth;
-    private bool isInvincible = false;
-    private float invincibilityTimer = 0f;
-
-    private void Awake()
+    /// <summary>
+    /// Refactored PlayerController using modular components
+    /// Attach Health, FlipController, GroundCheck, and ProjectileShooter components to the same GameObject
+    /// </summary>
+    [RequireComponent(typeof(Rigidbody2D))]
+    public class PlayerController : MonoBehaviour
     {
-        rb = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        animator = GetComponent<Animator>();
-        currentHealth = maxHealth;
-    }
+        [Header("Movement Settings")]
+        [SerializeField] private float moveSpeed = 8f;
+        [SerializeField] private float acceleration = 10f;
+        [SerializeField] private float deceleration = 10f;
 
-    private void Update()
-    {
-        if (isDead) return;
+        [Header("Jump Settings")]
+        [SerializeField] private float jumpForce = 12f;
+        [SerializeField] private float jumpBufferTime = 0.1f;
 
-        // Handle invincibility timer
-        if (isInvincible)
+        [Header("Collectibles")]
+        [SerializeField] private string coinTag = "Coin";
+
+        [Header("Water Settings")]
+        [SerializeField] private string waterTag = "Water";
+
+        [Header("Primary Attack Settings")]
+        [SerializeField] private float primaryAttackCooldown = 0.5f;
+        [SerializeField] private KeyCode primaryAttackKey1 = KeyCode.Z;
+        [SerializeField] private KeyCode primaryAttackKey2 = KeyCode.J;
+
+        [Header("Secondary Attack Settings")]
+        [SerializeField] private float secondaryAttackCooldown = 1f;
+        [SerializeField] private KeyCode secondaryAttackKey1 = KeyCode.X;
+        [SerializeField] private KeyCode secondaryAttackKey2 = KeyCode.K;
+
+        [Header("Dash Settings")]
+        [SerializeField] private float dashSpeed = 20f;
+        [SerializeField] private float dashDuration = 0.2f;
+        [SerializeField] private float dashCooldown = 1f;
+        [SerializeField] private KeyCode dashKey = KeyCode.LeftShift;
+
+        [Header("Long Idle Settings")]
+        [SerializeField] private float longIdleTime = 30f;
+
+        [Header("Ladder Settings")]
+        [SerializeField] private string ladderTag = "Ladder";
+        [SerializeField] private float climbSpeed = 8f;
+
+        // Component references
+        private Rigidbody2D rb;
+        private Animator animator;
+        private Health health;
+        private FlipController flipController;
+        private GroundCheck groundCheck;
+        private ProjectileShooter projectileShooter;
+
+        // Movement state
+        private float horizontalInput;
+        private float currentHorizontalVelocity;
+        private float jumpBufferCounter;
+
+        // Attack state
+        private bool isPrimaryAttacking;
+        private bool isSecondaryAttacking;
+        private float primaryAttackCooldownTimer;
+        private float secondaryAttackCooldownTimer;
+
+        // Dash state
+        private bool isDashing;
+        private float dashTimer;
+        private float dashCooldownTimer;
+        private float dashDirection;
+
+        // Idle state
+        private float idleTimer;
+        private bool isLongIdle;
+
+        // Ladder state
+        private bool isOnLadder;
+        private float verticalInput;
+        private float baseGravityScale;
+        // Collectibles
+        private int coinsCollected = 0;
+
+        // Water state
+        private bool isInWater;
+
+        public bool IsDead => health != null && health.Dead;
+        public int CoinsCollected => coinsCollected;
+
+        private void Awake()
         {
-            invincibilityTimer -= Time.deltaTime;
-            if (invincibilityTimer <= 0f)
+
+            // Get required components
+            rb = GetComponent<Rigidbody2D>();
+            animator = GetComponent<Animator>();
+
+            // Get modular components
+            health = GetComponent<Health>();
+            flipController = GetComponent<FlipController>();
+            groundCheck = GetComponent<GroundCheck>();
+            projectileShooter = GetComponent<ProjectileShooter>();
+
+            // Store base gravity scale
+            baseGravityScale = rb.gravityScale;
+
+            // Subscribe to health events
+            if (health != null)
             {
-                isInvincible = false;
-                // Reset sprite alpha
-                if (spriteRenderer != null)
+                health.OnDeath.AddListener(OnDeath);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (health != null)
+            {
+                health.OnDeath.RemoveListener(OnDeath);
+            }
+        }
+
+        private void Update()
+        {
+            if (IsDead) return;
+
+            HandleInput();
+            HandleAttack();
+            HandleDash();
+            UpdateCooldowns();
+            UpdateAnimations();
+        }
+
+        private void FixedUpdate()
+        {
+            if (IsDead) return;
+
+            if (isSecondaryAttacking) return;
+
+            // Handle ladder climbing
+            if (isOnLadder)
+            {
+                HandleLadderClimbing();
+                return;
+            }
+
+            if (isDashing)
+            {
+                rb.linearVelocity = new Vector2(dashDirection * dashSpeed, 0f);
+                dashTimer -= Time.fixedDeltaTime;
+                if (dashTimer <= 0f)
                 {
-                    Color color = spriteRenderer.color;
-                    color.a = 1f;
-                    spriteRenderer.color = color;
+                    isDashing = false;
                 }
-            }
-        }
-
-        HandleAttack();
-        HandleDash();
-
-        horizontalInput = Input.GetAxisRaw("Horizontal");
-
-        if (isGrounded)
-        {
-            coyoteTimeCounter = coyoteTime;
-        }
-        else
-        {
-            coyoteTimeCounter -= Time.deltaTime;
-        }
-
-        if (Input.GetButtonDown("Jump"))
-        {
-            jumpBufferCounter = jumpBufferTime;
-        }
-        else
-        {
-            jumpBufferCounter -= Time.deltaTime;
-        }
-
-        if (Input.GetButtonUp("Jump") && rb.linearVelocity.y > 0f)
-        {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * 0.5f);
-            coyoteTimeCounter = 0f;
-        }
-
-        Flip();
-        UpdateAnimations();
-        UpdateCooldowns();
-    }
-
-    private void FixedUpdate()
-    {
-        if (isDead) return;
-
-        if (isSecondaryAttacking)
-        {
-            // Keep current velocity during secondary attack (gravity handled by Rigidbody2D)
-            return;
-        }
-
-        if (isDashing)
-        {
-            rb.linearVelocity = new Vector2(dashDirection * dashSpeed, 0f);
-
-            dashTimer -= Time.fixedDeltaTime;
-            if (dashTimer <= 0f)
-            {
-                isDashing = false;
-            }
-            return;
-        }
-
-        // Handle jump in FixedUpdate for physics consistency
-        if (jumpBufferCounter > 0f && coyoteTimeCounter > 0f)
-        {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-            jumpBufferCounter = 0f;
-            coyoteTimeCounter = 0f;
-        }
-
-        // Calculate horizontal movement with acceleration/deceleration
-        float targetVelocity = horizontalInput * moveSpeed;
-        float accelerationRate = (Mathf.Abs(targetVelocity) > 0.01f) ? acceleration : deceleration;
-        currentHorizontalVelocity = Mathf.MoveTowards(currentHorizontalVelocity, targetVelocity, accelerationRate * Time.fixedDeltaTime);
-
-        // Apply movement using Rigidbody2D
-        rb.linearVelocity = new Vector2(currentHorizontalVelocity, rb.linearVelocity.y);
-    }
-
-    private void HandleAttack()
-    {
-        if ((Input.GetKeyDown(primaryAttackKey1) || Input.GetKeyDown(primaryAttackKey2))
-            && primaryAttackCooldownTimer <= 0f && !isPrimaryAttacking && !isSecondaryAttacking)
-        {
-            isPrimaryAttacking = true;
-            primaryAttackCooldownTimer = primaryAttackCooldown;
-
-            if (animator != null)
-            {
-                animator.SetTrigger("PrimaryAttack");
+                return;
             }
 
-            Debug.Log("Player used primary attack!");
+            HandleJump();
+            HandleMovement();
         }
 
-        if ((Input.GetKeyDown(secondaryAttackKey1) || Input.GetKeyDown(secondaryAttackKey2))
-            && secondaryAttackCooldownTimer <= 0f && !isPrimaryAttacking && !isSecondaryAttacking)
+        private void HandleInput()
         {
-            isSecondaryAttacking = true;
-            secondaryAttackCooldownTimer = secondaryAttackCooldown;
+            horizontalInput = Input.GetAxisRaw("Horizontal");
+            verticalInput = Input.GetAxisRaw("Vertical");
 
-            if (animator != null)
+            // Update flip controller
+            if (flipController != null)
             {
-                animator.SetTrigger("LongAttack");
+                flipController.UpdateFacing(horizontalInput);
             }
 
-            Debug.Log("Player used secondary attack!");
-        }
-    }
-
-    private void HandleDash()
-    {
-        if (Input.GetKeyDown(dashKey) && dashCooldownTimer <= 0f && !isDashing)
-        {
-            isDashing = true;
-            dashTimer = dashDuration;
-            dashCooldownTimer = dashCooldown;
-
-            if (Mathf.Abs(horizontalInput) > 0.01f)
+            // Jump buffer
+            if (Input.GetButtonDown("Jump"))
             {
-                dashDirection = Mathf.Sign(horizontalInput);
+                jumpBufferCounter = jumpBufferTime;
             }
             else
             {
-                dashDirection = isFacingRight ? 1f : -1f;
+                jumpBufferCounter -= Time.deltaTime;
             }
 
-            if (animator != null)
+            // Variable jump height
+            if (Input.GetButtonUp("Jump") && rb.linearVelocity.y > 0f)
             {
-                animator.SetTrigger("Dash");
-            }
-
-            Debug.Log("Player dashed!");
-        }
-    }
-
-    private void UpdateCooldowns()
-    {
-        if (primaryAttackCooldownTimer > 0f)
-        {
-            primaryAttackCooldownTimer -= Time.deltaTime;
-        }
-
-        if (primaryAttackCooldownTimer <= 0f && isPrimaryAttacking)
-        {
-            isPrimaryAttacking = false;
-        }
-
-        if (secondaryAttackCooldownTimer > 0f)
-        {
-            secondaryAttackCooldownTimer -= Time.deltaTime;
-        }
-
-        if (secondaryAttackCooldownTimer <= 0f && isSecondaryAttacking)
-        {
-            isSecondaryAttacking = false;
-        }
-
-        if (dashCooldownTimer > 0f)
-        {
-            dashCooldownTimer -= Time.deltaTime;
-        }
-    }
-
-
-
-    private void Flip()
-    {
-        // Flip the sprite based on movement direction
-        if (horizontalInput > 0f && !isFacingRight)
-        {
-            isFacingRight = true;
-            spriteRenderer.flipX = false;
-        }
-        else if (horizontalInput < 0f && isFacingRight)
-        {
-            isFacingRight = false;
-            spriteRenderer.flipX = true;
-        }
-    }
-
-    private void UpdateAnimations()
-    {
-        if (animator == null) return;
-
-        animator.SetFloat("Speed", Mathf.Abs(horizontalInput));
-        animator.SetBool("IsGrounded", isGrounded);
-        animator.SetBool("IsDashing", isDashing);
-        animator.SetBool("IsPrimaryAttacking", isPrimaryAttacking);
-        animator.SetBool("IsSecondaryAttacking", isSecondaryAttacking);
-        animator.SetBool("IsDead", isDead);
-
-        bool isJumping = !isGrounded && rb.linearVelocity.y > 0f;
-        bool isFalling = !isGrounded && rb.linearVelocity.y < 0f;
-        animator.SetBool("IsJumping", isJumping);
-        animator.SetBool("IsFalling", isFalling);
-
-        bool isStopping = isGrounded && Mathf.Abs(horizontalInput) < 0.01f && Mathf.Abs(currentHorizontalVelocity) > 0.1f;
-        animator.SetBool("IsStopping", isStopping);
-
-        bool isIdle = isGrounded && Mathf.Abs(horizontalInput) < 0.01f && Mathf.Abs(currentHorizontalVelocity) < 0.1f
-                      && !isPrimaryAttacking && !isSecondaryAttacking && !isDashing;
-
-        if (isIdle)
-        {
-            idleTimer += Time.deltaTime;
-            if (idleTimer >= longIdleTime && !isLongIdle)
-            {
-                isLongIdle = true;
-                animator.SetTrigger("LongIdle");
-            }
-        }
-        else
-        {
-            idleTimer = 0f;
-            isLongIdle = false;
-        }
-    }
-
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag(groundTag))
-        {
-            // Check if we're hitting from above (standing on ground) vs from the side
-            foreach (ContactPoint2D contact in collision.contacts)
-            {
-                // Normal pointing up means we're standing on top
-                if (contact.normal.y > 0.5f)
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * 0.5f);
+                if (groundCheck != null)
                 {
-                    isGrounded = true;
-                    return;
+                    groundCheck.ConsumeCoyoteTime();
                 }
             }
         }
-    }
 
-    private void OnCollisionStay2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag(groundTag))
+        private void HandleJump()
         {
-            // Continuously check ground contact while colliding
-            bool foundGround = false;
-            foreach (ContactPoint2D contact in collision.contacts)
+            bool canJump = (groundCheck != null && groundCheck.CanJump) || isInWater;
+
+            if (jumpBufferCounter > 0f && canJump)
             {
-                if (contact.normal.y > 0.5f)
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+                jumpBufferCounter = 0f;
+                if (groundCheck != null)
                 {
-                    foundGround = true;
-                    break;
+                    groundCheck.ConsumeCoyoteTime();
                 }
             }
-            isGrounded = foundGround;
         }
-    }
 
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        if (other.gameObject.CompareTag(coinTag))
+        private void HandleMovement()
         {
-            coinsCollected++;
-            Debug.Log($"Coin collected! Total coins: {coinsCollected}");
-            Destroy(other.gameObject);
+            float targetVelocity = horizontalInput * moveSpeed;
+            float accelerationRate = (Mathf.Abs(targetVelocity) > 0.01f) ? acceleration : deceleration;
+            currentHorizontalVelocity = Mathf.MoveTowards(currentHorizontalVelocity, targetVelocity, accelerationRate * Time.fixedDeltaTime);
+            rb.linearVelocity = new Vector2(currentHorizontalVelocity, rb.linearVelocity.y);
         }
-    }
 
-    private void OnCollisionExit2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag(groundTag))
+        private void HandleLadderClimbing()
         {
-            isGrounded = false;
+            // Handle vertical climbing
+            float verticalVelocity = verticalInput * climbSpeed;
+            rb.linearVelocity = new Vector2(horizontalInput * moveSpeed * 0.5f, verticalVelocity);
+            rb.gravityScale = 0f;
+
+            Debug.Log($"Climbing ladder - Vertical: {verticalInput}");
         }
-    }
 
-    /// <summary>
-    /// Deal damage to the player
-    /// </summary>
-    public void TakeDamage(float damage)
-    {
-        if (isDead || isInvincible) return;
-
-        currentHealth -= damage;
-        Debug.Log($"Player took {damage} damage! Current HP: {currentHealth}/{maxHealth}");
-
-        // Start invincibility
-        isInvincible = true;
-        invincibilityTimer = invincibilityDuration;
-
-        // Visual feedback - flash sprite
-        if (spriteRenderer != null)
+        private void HandleAttack()
         {
-            Color color = spriteRenderer.color;
-            color.a = 0.5f;
-            spriteRenderer.color = color;
+            // Primary Attack
+            if ((Input.GetKeyDown(primaryAttackKey1) || Input.GetKeyDown(primaryAttackKey2))
+                && primaryAttackCooldownTimer <= 0f && !isPrimaryAttacking && !isSecondaryAttacking)
+            {
+                isPrimaryAttacking = true;
+                primaryAttackCooldownTimer = primaryAttackCooldown;
+
+                if (animator != null)
+                {
+                    animator.SetTrigger("PrimaryAttack");
+                }
+
+                Debug.Log("Player used primary attack!");
+            }
+
+            // Secondary Attack (Projectile)
+            if ((Input.GetKeyDown(secondaryAttackKey1) || Input.GetKeyDown(secondaryAttackKey2))
+                && secondaryAttackCooldownTimer <= 0f && !isPrimaryAttacking && !isSecondaryAttacking)
+            {
+                if (projectileShooter != null)
+                {
+                    isSecondaryAttacking = true;
+                    secondaryAttackCooldownTimer = secondaryAttackCooldown;
+
+                    if (animator != null)
+                    {
+                        animator.SetTrigger("LongAttack");
+                    }
+
+                    // moved to animation event
+                    // projectileShooter.Shoot();
+                    Debug.Log("Player used secondary attack!");
+                }
+            }
         }
 
-        if (animator != null)
+        private void HandleDash()
         {
-            animator.SetTrigger("TakeHit");
+            if (Input.GetKeyDown(dashKey) && dashCooldownTimer <= 0f && !isDashing)
+            {
+                isDashing = true;
+                dashTimer = dashDuration;
+                dashCooldownTimer = dashCooldown;
+
+                if (Mathf.Abs(horizontalInput) > 0.01f)
+                {
+                    dashDirection = Mathf.Sign(horizontalInput);
+                }
+                else if (flipController != null)
+                {
+                    dashDirection = flipController.FacingDirection;
+                }
+                else
+                {
+                    dashDirection = 1f;
+                }
+
+                if (animator != null)
+                {
+                    animator.SetTrigger("Dash");
+                }
+
+                Debug.Log("Player dashed!");
+            }
         }
 
-        if (currentHealth <= 0f)
+        private void UpdateCooldowns()
         {
-            Die();
+            if (primaryAttackCooldownTimer > 0f)
+            {
+                primaryAttackCooldownTimer -= Time.deltaTime;
+            }
+
+            if (primaryAttackCooldownTimer <= 0f && isPrimaryAttacking)
+            {
+                isPrimaryAttacking = false;
+            }
+
+            if (secondaryAttackCooldownTimer > 0f)
+            {
+                secondaryAttackCooldownTimer -= Time.deltaTime;
+            }
+
+            if (secondaryAttackCooldownTimer <= 0f && isSecondaryAttacking)
+            {
+                isSecondaryAttacking = false;
+            }
+
+            if (dashCooldownTimer > 0f)
+            {
+                dashCooldownTimer -= Time.deltaTime;
+            }
         }
-    }
 
-    private void Die()
-    {
-        isDead = true;
-        currentHealth = 0f;
-        rb.linearVelocity = Vector2.zero;
-
-        Debug.Log("Player died!");
-
-        if (animator != null)
+        private void UpdateAnimations()
         {
-            animator.SetTrigger("Die");
-            animator.SetBool("IsDead", true);
+            if (animator == null) return;
+
+            bool isGrounded = groundCheck != null && groundCheck.IsGrounded;
+
+            animator.SetFloat("Speed", Mathf.Abs(horizontalInput));
+            animator.SetBool("IsGrounded", isGrounded);
+            animator.SetBool("IsDashing", isDashing);
+            animator.SetBool("IsPrimaryAttacking", isPrimaryAttacking);
+            animator.SetBool("IsSecondaryAttacking", isSecondaryAttacking);
+            animator.SetBool("IsDead", IsDead);
+            animator.SetBool("IsClimbing", isOnLadder && Mathf.Abs(verticalInput) > 0.01f); // in case I add a climbing animation
+
+            bool isJumping = !isGrounded && rb.linearVelocity.y > 0f;
+            bool isFalling = !isGrounded && rb.linearVelocity.y < 0f;
+            animator.SetBool("IsJumping", isJumping);
+            animator.SetBool("IsFalling", isFalling);
+
+            bool isStopping = isGrounded && Mathf.Abs(horizontalInput) < 0.01f && Mathf.Abs(currentHorizontalVelocity) > 0.1f;
+            animator.SetBool("IsStopping", isStopping);
+
+            // Long idle handling
+            bool isIdle = isGrounded && Mathf.Abs(horizontalInput) < 0.01f && Mathf.Abs(currentHorizontalVelocity) < 0.1f
+                          && !isPrimaryAttacking && !isSecondaryAttacking && !isDashing;
+
+            if (isIdle)
+            {
+                idleTimer += Time.deltaTime;
+                if (idleTimer >= longIdleTime && !isLongIdle)
+                {
+                    isLongIdle = true;
+                    animator.SetTrigger("LongIdle");
+                }
+            }
+            else
+            {
+                idleTimer = 0f;
+                isLongIdle = false;
+            }
         }
-    }
 
-    /// <summary>
-    /// Returns current health
-    /// </summary>
-    public float GetCurrentHealth()
-    {
-        return currentHealth;
-    }
+        private void OnTriggerEnter2D(Collider2D other)
+        {
+            if (other.gameObject.CompareTag(coinTag))
+            {
+                coinsCollected++;
+                Debug.Log($"Coin collected! Total coins: {coinsCollected}");
+                Destroy(other.gameObject);
+            }
 
-    /// <summary>
-    /// Returns max health
-    /// </summary>
-    public float GetMaxHealth()
-    {
-        return maxHealth;
-    }
+            if (other.gameObject.CompareTag(waterTag))
+            {
+                isInWater = true;
+            }
 
-    /// <summary>
-    /// Returns whether the player is dead
-    /// </summary>
-    public bool IsDead()
-    {
-        return isDead;
+            if (other.gameObject.CompareTag("End"))
+            {
+                Debug.Log("you win!!!");
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            }
+
+            if (other.gameObject.CompareTag(ladderTag))
+            {
+                isOnLadder = true;
+                Debug.Log("Entered ladder");
+            }
+        }
+
+        private void OnTriggerExit2D(Collider2D other)
+        {
+            if (other.gameObject.CompareTag(waterTag))
+            {
+                isInWater = false;
+            }
+
+            if (other.gameObject.CompareTag(ladderTag))
+            {
+                isOnLadder = false;
+                rb.gravityScale = baseGravityScale;
+                Debug.Log("Exited ladder");
+            }
+        }
+
+        private void OnDeath()
+        {
+            rb.linearVelocity = Vector2.zero;
+            Debug.Log("Player died!");
+        }
+
+        // Public methods for external access
+        public void AddCoins(int amount)
+        {
+            coinsCollected += amount;
+        }
+
+        public Health GetHealth() => health;
+        public FlipController GetFlipController() => flipController;
+        public GroundCheck GetGroundCheck() => groundCheck;
+        public ProjectileShooter GetProjectileShooter() => projectileShooter;
     }
 }

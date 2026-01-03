@@ -8,6 +8,10 @@ TagManager:
   - Treasure
   - End
   - Ground
+  - Water
+  - Enemy
+  - Wall
+  - Ladder
   layers:
   - Default
   - TransparentFX

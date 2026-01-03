@@ -1,17 +1,20 @@
 using UnityEngine;
 
-public class PlayerInit : MonoBehaviour
+namespace Platformer
 {
-    [SerializeField] private GameObject player;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    public class PlayerInit : MonoBehaviour
     {
-        GameObject instance = Instantiate(player, transform.position, Quaternion.identity);
-    }
+        [SerializeField] private GameObject player;
+        // Start is called once before the first execution of Update after the MonoBehaviour is created
+        void Start()
+        {
+            GameObject instance = Instantiate(player, transform.position, Quaternion.identity);
+        }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
+        // Update is called once per frame
+        void Update()
+        {
+
+        }
     }
 }
